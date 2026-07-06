@@ -19,13 +19,15 @@
 #include <typeindex>
 #include <unordered_map>
 #include <functional>
+#include <stdexcept>
 #include <type_traits>
+#include <utility>
 #include <mutex>
 
 // Ensure.hpp is an optional dependency: if it's available (either as part of this
-// checkout or vendored alongside this header), use its ensure() for a formatted
-// diagnostic on failure; otherwise fall back to plain assert() so this header still
-// works standalone.
+// checkout or vendored alongside this header), use its ensure()/throw_if() for a
+// formatted diagnostic on failure; otherwise fall back to equivalent local
+// implementations so this header still works standalone.
 #if __has_include("commons/Ensure.hpp")
 	#include "commons/Ensure.hpp"
 #elif __has_include("Ensure.hpp")
@@ -38,6 +40,18 @@
 	// itself, so this still catches that case even under an unknown filename.
 	#if !defined(COMMONS_ENSURE_HPP) && !defined(ensure)
 		#define ensure(condition, ...) assert((condition))
+	#endif
+	// (throw_if is a function template, not a macro, so #ifndef can't guard
+	// it directly -- redefining it without this check would be a hard error.)
+	// A second guard (distinct from COMMONS_ENSURE_HPP) covers the case where two
+	// headers using this same standalone fallback are included together.
+	#if !defined(COMMONS_ENSURE_HPP) && !defined(COMMONS_THROW_IF_FALLBACK_DEFINED)
+	#define COMMONS_THROW_IF_FALLBACK_DEFINED
+	template<class T, class... Args>
+	constexpr inline void throw_if(bool condition, Args&&... args) {
+		if (condition)
+			throw T(std::forward<Args>(args)...);
+	}
 	#endif
 #endif
 
@@ -83,11 +97,11 @@ namespace rt {
 		 *
 		 * @param id The id returned from addHandler().  Must identify a type that still has at
 		 * least one registered handler; passing an id for a type with none is a usage error
-		 * (checked via ensure()).
+		 * (checked via throw_if()).
 		 */
 		void removeHandler(const HandlerReference& id) {
 			auto iter = handlersMap.find(id);
-			ensure(iter != handlersMap.end(), "removeHandler called for a type with no registered handlers");
+			throw_if<std::invalid_argument>(iter == handlersMap.end(), "removeHandler called for a type with no registered handlers");
 			iter->second->removeHandler(id.index);
 		}
 
@@ -259,7 +273,7 @@ namespace rt {
 		 *
 		 * @param id The id returned from addHandler().  Must identify a type that still has at
 		 * least one registered handler; passing an id for a type with none is a usage error
-		 * (checked via ensure()).
+		 * (checked via throw_if()).
 		 */
 		 void removeHandler(const HandlerReference& id) {
 			const std::lock_guard<std::recursive_mutex> lock(mutex);
