@@ -1,5 +1,7 @@
 # Router.hpp
 
+[API docs](https://lrmoorejr.github.io/router/)
+
 A small, type-safe pub/sub event dispatcher for C++20. Register a handler for an event class
 with `addHandler()`, then broadcast events of that type with `handle()` -- no base class, no
 enum of event kinds, no manual `dynamic_cast`. Handlers are matched by `std::type_index`, so any
